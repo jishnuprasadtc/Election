@@ -1,9 +1,9 @@
 from django.contrib import messages
 from django.shortcuts import render
-from django.views.generic import TemplateView,CreateView
+from django.views.generic import TemplateView,CreateView,DetailView
 from django.urls import reverse_lazy
 
-from . models import Election,Position,Candidates
+from . models import Election,Position,Candidates,Vote
 from . form import Candidateapplyform
 # Create your views here.
 
@@ -34,3 +34,22 @@ class CandinateApplyView(CreateView):
         messages.success(self.request, "Application submitted.")
         return super().form_valid(form)
 
+
+class PostionDetailView(DetailView):
+    model=Position
+    pk_url_kwarg="postion_id"
+    template_name= "election/position_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context= super().get_context_data(**kwargs)
+        position=self.get_object
+
+        context=["candidates"]=position.candidates.select_related("user")
+        already_voted = False
+        if self.request.user.is_authenticated:
+            already_voted = Vote.objects.filter(
+                voter=self.request.user, position=position
+            ).exists()
+
+        context["already_voted"] = already_voted
+        return context
