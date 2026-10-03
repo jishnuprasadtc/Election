@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172033">
+  <title>Calculator</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; padding: 24px; display: grid; place-items: center; background: #eef2f8; color: #f7f9ff; font-family: system-ui, sans-serif; }
+    .calculator { width: min(100%, 360px); padding: 20px; border-radius: 24px; background: #172033; box-shadow: 0 24px 60px #17203335; }
+    .display { width: 100%; min-height: 96px; margin-bottom: 16px; padding: 16px 12px; overflow: auto; white-space: nowrap; border-radius: 14px; background: #202b41; text-align: right; font: 400 42px/1.4 ui-monospace, monospace; }
+    .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    button { min-height: 64px; border: 0; border-radius: 14px; background: #2b3851; color: inherit; font: 600 21px system-ui, sans-serif; cursor: pointer; }
+    button:hover { filter: brightness(1.18); }
+    button:active { transform: scale(.96); }
+    button:focus-visible { outline: 3px solid #9db6ff; outline-offset: 2px; }
+    .utility { background: #46536c; }
+    .operator { background: #354a70; color: #c9d9ff; }
+    .equals { grid-row: span 2; background: #6589f5; }
+    .zero { grid-column: span 2; }
+    @media (max-width: 380px) { .calculator { padding: 14px; } button { min-height: 58px; } }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Calculator">
+    <output class="display" id="display" aria-live="polite">0</output>
+    <div class="keys">
+      <button class="utility" data-action="clear">AC</button>
+      <button class="utility" data-action="sign" aria-label="Change sign">+/-</button>
+      <button class="utility" data-action="percent">%</button>
+      <button class="operator" data-value="/" aria-label="Divide">/</button>
+      <button data-value="7">7</button><button data-value="8">8</button><button data-value="9">9</button><button class="operator" data-value="*" aria-label="Multiply">*</button>
+      <button data-value="4">4</button><button data-value="5">5</button><button data-value="6">6</button><button class="operator" data-value="-" aria-label="Subtract">-</button>
+      <button data-value="1">1</button><button data-value="2">2</button><button data-value="3">3</button><button class="operator" data-value="+">+</button>
+      <button class="zero" data-value="0">0</button><button data-action="decimal">.</button><button class="equals" data-action="equals">=</button>
+    </div>
+  </main>
+  <script>
+    const display = document.querySelector('#display');
+    let expression = '', justCalculated = false;
+    const show = () => {
+      display.textContent = expression || '0';
+      display.scrollLeft = display.scrollWidth;
+    };
+    function press(button) {
+      const value = button.dataset.value;
+      const action = button.dataset.action;
+      if (value !== undefined) {
+        if (/^\d$/.test(value)) {
+          if (justCalculated || expression === 'Error') expression = '';
+          expression += value;
+          justCalculated = false;
+        } else {
+          justCalculated = false;
+          if (/[+*/-]$/.test(expression)) expression = expression.slice(0, -1) + value;
+          else if (expression && !expression.endsWith('.')) expression += value;
+        }
+      } else if (action === 'clear') {
+        expression = '';
+        justCalculated = false;
+      } else if (action === 'decimal') {
+        if (justCalculated || expression === 'Error') expression = '';
+        justCalculated = false;
+        const operand = expression.split(/[+*/-]/).pop();
+        if (!operand.includes('.')) expression += (operand ? '' : '0') + '.';
+      } else if (action === 'sign') {
+        const match = expression.match(/\d*\.?\d+$/);
+        if (match) {
+          const start = match.index;
+          const hasUnaryMinus = start > 0 && expression[start - 1] === '-' &&
+            (start === 1 || /[+*/-]/.test(expression[start - 2]));
+          expression = expression.slice(0, hasUnaryMinus ? start - 1 : start) +
+            (hasUnaryMinus ? '' : '-') + match[0];
+          justCalculated = false;
+        }
+      } else if (action === 'percent') {
+        const match = expression.match(/\d*\.?\d+$/);
+        if (match) expression = expression.slice(0, match.index) + String(Number(match[0]) / 100);
+        justCalculated = false;
+      } else if (action === 'equals' && expression && !/[+*/.-]$/.test(expression)) {
+        if (!/^[\d.+*/() -]+$/.test(expression)) expression = 'Error';
+        else {
+          try {
+            const result = Function('"use strict"; return (' + expression + ')')();
+            expression = Number.isFinite(result) ? String(Number(result.toPrecision(11))) : 'Error';
+          } catch { expression = 'Error'; }
+        }
+        justCalculated = true;
+      }
+      show();
+    }
+    document.querySelector('.keys').addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (button) press(button);
+    });
+    document.addEventListener('keydown', event => {
+      const map = { '*': '*', '/': '/', '-': '-', Enter: '=', '=': '=', Escape: 'AC', Backspace: 'backspace' };
+      const key = map[event.key] ?? event.key;
+      if ('0123456789.+*/-'.includes(key)) {
+        event.preventDefault();
+        press(key === '.' ? { dataset: { action: 'decimal' } } : { dataset: { value: key } });
+      } else if (key === '=') press({ dataset: { action: 'equals' } });
+      else if (key === 'AC') press({ dataset: { action: 'clear' } });
+      else if (key === '%') press({ dataset: { action: 'percent' } });
+      else if (key === 'backspace') { expression = expression.slice(0, -1); justCalculated = false; show(); }
+    });
+  </script>
+</body>
+</html>
